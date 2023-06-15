@@ -1,8 +1,8 @@
 # Project: "Macrophyte-hydrodynamic interactions mediate stratification and dissolved oxygen dynamics in ponds"
 #           Part of ISU Hort Farm Pond Study, 2020
-# Last Modified 22 September 2022
+# Last Modified 15 June 2023
 # Contributors: Ellen Albright, Robert Ladwig, Grace Wilkinson
-# Description: "final" analyses and figures for manuscript submission, L&O
+# Description: "final" analyses and figures for manuscript submission
 
 # Data citation: ______________
 
@@ -19,13 +19,14 @@
 #    6. Individual csv's for each chain of temperature sensors with missing 0.25m intervals have been interpolated for visualization
 #          "temp_interpolated_Fdeep.csv", "temp_interpolated_Fmiddle.csv", "temp_interpolated_Fshallow.csv"
 #          "temp_interpolated_Bdeep.csv", "temp_interpolated_Bmiddle.csv", "temp_interpolated_Bshallow.csv"
-#    7. "meteorological_ISU_horfarm.csv" - meterological data from ISU soil moisture network
+#    7. "meteorological_ISU_hortfarm.csv" - meterological data from ISU soil moisture network
 #        Data Source: https://mesonet.agron.iastate.edu/agclimate/ 
 #    8. "DO_profiles_2020.csv" - manual, continuous profiles of DO across experimental ponds B and F, May-August 2020
 #    9. High frequency temperature profiles in wide format for use in r Lake Analyzer (text files, one file per site)
 #          "temp_hf_Fmid_wide.txt", "temp_hf_Bmid_wide.txt"
 #   10. "pond_hypsography.txt" - depth area relationship for experimental ponds
 #   11. "wind2_wide.txt" - wide format wind data (from meteorological_ISU_hortfarm)
+#   12. "secchi.csv" - daily secchi depth measurements, used in calculation of expected depth threshold for polymixis
 
 #TEXT FILES OF WIDE-FORMAT DATA FOR MIDDLE SITE OF EACH POND - CALC thermodepth, LN. Wide format wind and hypso for LN
 
@@ -68,10 +69,11 @@ library(RColorBrewer)
 #         Fig. 6 - Heatmap of bottom water DO and macrophyte biomass
 # Figures included in supplementary materials
 #         Fig. S1 - Examples of individual DO saturation profiles near deep sites (methods)
-#         Fig. S2 - Estimated thermocline depth over time by pond
-#         Fig. S3 - Lake Number over time by pond
+#         Fig. S2 - Qualitative comparison of macrophyte growth and senescence across all six experimental ponds
+#         Fig. S3 - Estimated thermocline depth over time by pond
 #         Fig. S4 - Bottom water temperature time series across sampling sites
 #         Fig. S5 - Time series of surface, bottom, a delta-dissolved oxygen saturation
+# Appendix: Calculation of critical depth of polymixis
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -93,7 +95,7 @@ pondF_col_dark = rgb(0, 137, 134, max = 255, alpha = 255)
 
 # MAIN MANUSCRIPT FIGURES -----------------------------------------------------------------------------------------------------------------
 # PART 1: EXPERIMENTAL CONTEXT AND ENVIRONMENTAL STRESSORS --------------------------------------------------------------------------------
-#### FIGURE 2A - Chlorophyll-a time series (gam code from Grace Wilkinson) --------------------------------------------------------------------
+#### FIGURE 2B - Chlorophyll-a time series (gam code from Grace Wilkinson) --------------------------------------------------------------------
 
 # Read in data (hort20_surface_dat.csv), subset by study pond
 pondB_chl = read_csv("hort20_surface_dat.csv") %>%
@@ -114,7 +116,7 @@ chlF_gam <- gam(chla ~ s(doy, k = 40),
 summary(chlF_gam)
 gam.check(chlF_gam)
 
-#### FIGURE 2A----------------------------------------------------------------------
+#### FIGURE 2B----------------------------------------------------------------------
 chla_plot<-
 ggplot(data=pondB_chl, aes(x=doy, y=chla))+
   geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color=NA, fill="grey80")+
@@ -125,12 +127,12 @@ ggplot(data=pondB_chl, aes(x=doy, y=chla))+
   geom_point(data=pondF_chl, aes(x=doy, y=chla),color=pondF_col,size=2,shape=15)+
   geom_smooth(data=pondF_chl, aes(x=doy, y=chla),method = "gam", formula = y ~ s(x, k = 40), size = 1, color=pondF_col, fill=pondF_col_transparent)+
   theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab("Day of Year") + ylab(bquote("Chlorophyll-a (?g"*~L^-1*")"))+theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11),
+  xlab("Day of Year") + ylab(bquote("Chlorophyll-a (µg"*~L^-1*")"))+theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11),
                                                                           axis.title.x=element_blank(),axis.text.x=element_blank())+
   geom_vline(xintercept=176,color="grey10",linetype="dashed",size=0.7)+
   geom_vline(xintercept=211,color="grey10",linetype="dashed",size=0.7)
   
-  #### FIGURE 2B - Surface water temperature time series ------------------------------------------------------------------------------------------
+#### FIGURE 2A - Surface water temperature time series ------------------------------------------------------------------------------------------
 # read in high frequency temperature data (temp_profiles_2020.csv), subset to exclude shallow site
 temp_deeper = read_csv("temp_profiles_2020.csv") %>%
   filter(site_id != '21')
@@ -150,7 +152,7 @@ quantile(mean_pond_daily_surface_temp$pond_meanTEMP[mean_pond_daily_surface_temp
 quantile(mean_pond_daily_surface_temp$pond_meanTEMP[mean_pond_daily_surface_temp$pond=="B"], probs=c(0.9, 0.95)) # 90% = 29.29, 95%=29.80
 
 
-#### FIGURE 2B----------------------------------------------------------------------
+#### FIGURE 2A----------------------------------------------------------------------
 surface_temp_plot<-
 ggplot(data=mean_pond_daily_surface_temp, aes(group=pond))+
   ylim(16, 39)+xlim(143,240)+
@@ -170,11 +172,11 @@ ggplot(data=mean_pond_daily_surface_temp, aes(group=pond))+
   scale_color_manual(values=c(pondB_col, pondF_col))+
   scale_shape_manual(values=c(16,15))+
   theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab("Day of Year") + ylab(bquote("Surface Water Temperature (?C)"))+
+  xlab("Day of Year") + ylab(bquote("Surface Water Temperature (°C)"))+
   theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11),legend.position="none",axis.title.x=element_blank(),axis.text.x=element_blank())
 
 
-#### FIGURE 2C - Surface water dissolved oxygen time series --------------------------------------------------------------------------------
+#### FIGURE 2D - Surface water dissolved oxygen time series --------------------------------------------------------------------------------
 # read in high frequency DO data (hf_surfaceDO.csv), subset to exclude experimental ponds that Tyler studied
 hfDO<-read_csv("hf_surfaceDO.csv") %>% 
   filter(pond=="B" | pond=="F")
@@ -185,7 +187,7 @@ daily_hfDO<-hfDO %>%
   summarize(across(c(do, dosat), ~mean(., na.rm=T))) %>%
   ungroup()
 
-#### FIGURE 2C --------------------------------------------------------------------
+#### FIGURE 2D --------------------------------------------------------------------
 hfDOplot<-
   ggplot(data=hfDO, aes(x=doy_frac, y=dosat, group=pond))+
   geom_hline(yintercept=100,color="grey30",linetype="solid",size=0.7)+
@@ -199,11 +201,10 @@ hfDOplot<-
   geom_vline(xintercept=176,color="grey10",linetype="dashed",size=0.7)+
   geom_vline(xintercept=211,color="grey10",linetype="dashed",size=0.7)+
   theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab("Day of Year") + ylab("Surface DO Saturation (%)")+theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11),
-                                                                axis.title.x=element_blank(),axis.text.x=element_blank())+
+  xlab("Day of Year, 2020") + ylab("Surface DO Saturation (%)")+theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11))+
   theme(legend.title=element_blank(), legend.position = "none",legend.text = element_text(size=10))
 
-#### FIGURE 2D - Mean macrophyte biomass time series by study pond ------------------------------------------------------------------------------
+#### FIGURE 2C - Mean macrophyte biomass time series by study pond ------------------------------------------------------------------------------
 # read in macrophyte data and subset biomass data
 biomass = read_csv("biomass_canopy_2020.csv") %>% 
   filter(site_type == "Biomass")
@@ -231,13 +232,13 @@ bio_weighted_mean<-bio_mean_pondweight %>%
   slice(n=1) %>% 
   ungroup()
 
-#### FIGURE 2D ----------------------------------------------------------------------------------------------------------------------------------
+#### FIGURE 2C ----------------------------------------------------------------------------------------------------------------------------------
 mac_bio_plot<-
 ggplot(data=bio_weighted_mean)+
   xlim(143,240)+ylim(10,115)+
   theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
   xlab("Day of Year, 2020")+ylab(bquote("Mean Macrophyte Biomass (g "*~m^-2*")")) +theme(axis.text.x=element_text(color="black",size=9),axis.title.x=element_text(size=11))+
-  theme(legend.title=element_blank(), legend.position = "none",legend.text = element_text(size=10))+
+  theme(legend.title=element_blank(), legend.position = "none",legend.text = element_text(size=10),axis.title.x=element_blank(),axis.text.x=element_blank())+
   geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color=NA, fill="grey80")+
   geom_vline(xintercept=176,color="grey10",linetype="dashed",size=0.7)+
   geom_vline(xintercept=211,color="grey10",linetype="dashed",size=0.7)+
@@ -248,7 +249,7 @@ ggplot(data=bio_weighted_mean)+
 
 
 #### FULL FIGURE 2
-final_figure2<-plot_grid(chla_plot,surface_temp_plot,hfDOplot,mac_bio_plot,nrow=4,align="v")
+final_figure2<-plot_grid(surface_temp_plot,chla_plot,mac_bio_plot,hfDOplot,nrow=4,align="v")
 ggsave("Figure2.png", final_figure2, width=5.5, height=10.5, units="in", dpi=300)
 
 #### FIGURE 3 - MACROPHYTE BIOMASS RESPONSE TO STRESSORS -------------------------------------------------------------------------------------------
@@ -272,10 +273,36 @@ biomass_map_fig3<-
   scale_fill_manual(values=c("#dfc27d","#003c30","#35978f","#c7eae5"))+
   geom_point(shape=21,colour="black")+theme_void()+
   labs(x="",y="",size=bquote("Biomass (g"*~m^-2*")"),fill="")+
+  theme(legend.position="bottom",legend.box="vertical",legend.text=element_text(size=11),legend.key.width=unit(1.5, "cm"),axis.title.x=element_blank(),axis.text.x=element_blank())+
+  guides(size=guide_legend(nrow=1))
+
+# updated figure with more clear event lines (red #e31a1c)
+biomass_map_fig3_new<-
+  ggplot(bio_map,aes(X,Y,size=biomass_gm2,fill=Species))+
+  geom_rect(aes(xmin=0.5, xmax=3.5, ymin=0.5, ymax=6.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=0.5, xmax=3.5, ymin=7.5, ymax=13.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=4.5, xmax=7.5, ymin=0.5, ymax=6.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=4.5, xmax=7.5, ymin=7.5, ymax=13.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=8.5, xmax=11.5, ymin=0.5, ymax=6.5), size=1.5, color="black", fill=NA)+
+  geom_rect(aes(xmin=8.5, xmax=11.5, ymin=7.5, ymax=13.5), size=1.5, color="black", fill=NA)+
+  geom_rect(aes(xmin=12.5, xmax=15.5, ymin=0.5, ymax=6.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=12.5, xmax=15.5, ymin=7.5, ymax=13.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=16.5, xmax=19.5, ymin=0.5, ymax=6.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=16.5, xmax=19.5, ymin=7.5, ymax=13.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=20.5, xmax=23.5, ymin=0.5, ymax=6.5), size=1, color="black", fill=NA)+
+  geom_rect(aes(xmin=20.5, xmax=23.5, ymin=7.5, ymax=13.5), size=1, color="black", fill=NA)+
+  geom_segment(aes(x=7.8, y=7, xend=7.8, yend=14), size=1, linetype="dashed", color="black")+
+  geom_segment(aes(x=16, y=7, xend=16, yend=14), size=1, linetype="dashed", color="black")+
+  geom_segment(aes(x=8.2, y=7, xend=8.2, yend=14), size=1, linetype="solid", color="#e31a1c")+
+  geom_segment(aes(x=8.2, y=0, xend=8.2, yend=7), size=1, linetype="solid", color="#e31a1c")+
+  scale_size(range=c(2,20))+
+  scale_fill_manual(values=c("#dfc27d","#003c30","#35978f","#c7eae5"))+
+  geom_point(shape=21,colour="black")+theme_void()+
+  labs(x="",y="",size=bquote("Biomass (g"*~m^-2*")"),fill="")+
   theme(legend.position="bottom",legend.box="vertical",legend.text=element_text(size=11),legend.key.width=unit(1.5, "cm"))+
   guides(size=guide_legend(nrow=1))
 
-ggsave("Figure3.png", biomass_map_fig3, width=8, height=7, units="in", dpi=300)
+ggsave("Figure3new.png", biomass_map_fig3_new, width=8, height=7, units="in", dpi=300)
 
 # PART 2: SPATIOTEMPORAL VARIATION IN THERMAL STRUCTURE --------------------------------------------------------------------------------------------
 #### FIGURE 4 - Water temp heat maps and macrophyte canopy height (intrinsic factors controlling pond thermal structure) ---------------------------
@@ -303,8 +330,9 @@ Bfinal_shallow <- read.csv("temp_interpolated_Bshallow.csv")
 # Water temperature profile heat maps - testing spectral color ramp
 spref_shal<-ggplot(Ffinal_shallow, aes(doy_frac, temp_depth_m, fill= temp_c)) + 
   geom_tile()+ylim(c(2.15,-0.15))+
-  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
-  geom_segment(aes(x = 185, y = 1.65, xend = 190, yend = 1.65), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = 1.65, xend = 190, yend = 1.65), size=1.2, col="black")+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
   xlim(143,233)+
   scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, 'Spectral')),name="Temperature (C)",
                        limits=c(14,38),)+
@@ -313,8 +341,11 @@ spref_shal<-ggplot(Ffinal_shallow, aes(doy_frac, temp_depth_m, fill= temp_c)) +
 
 spnut_shal<-ggplot(Bfinal_shallow, aes(doy_frac, temp_depth_m, fill= temp_c)) + 
   geom_tile()+ylim(c(2.15,-0.15))+
-  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
-  geom_segment(aes(x = 185, y = 1.65, xend = 190, yend = 1.65), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = 1.65, xend = 190, yend = 1.65), size=1.2, col="black")+
+  geom_vline(xintercept=176, linetype="dashed")+
+  geom_vline(xintercept=211, linetype="dashed")+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
   xlim(143,233)+
   scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, 'Spectral')),name="Temperature (C)",
                        limits=c(14,38),)+
@@ -323,8 +354,9 @@ spnut_shal<-ggplot(Bfinal_shallow, aes(doy_frac, temp_depth_m, fill= temp_c)) +
 
 spref_mid<-ggplot(Ffinal_mid, aes(doy_frac, temp_depth_m, fill= temp_c)) + 
   geom_tile()+ylim(c(2.15,-0.15))+
-  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
-  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
   xlim(143,233)+
   scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, 'Spectral')),name="Temperature (C)",
                        limits=c(14,38),)+
@@ -334,8 +366,11 @@ spref_mid<-ggplot(Ffinal_mid, aes(doy_frac, temp_depth_m, fill= temp_c)) +
 
 spnut_mid<-ggplot(Bfinal_mid, aes(doy_frac, temp_depth_m, fill= temp_c)) + 
   geom_tile()+ylim(c(2.15,-0.15))+
-  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
-  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+  geom_vline(xintercept=176, linetype="dashed")+
+  geom_vline(xintercept=211, linetype="dashed")+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
   xlim(143,233)+
   scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, 'Spectral')),name="Temperature (C)",
                        limits=c(14,38),)+
@@ -346,8 +381,9 @@ spnut_mid<-ggplot(Bfinal_mid, aes(doy_frac, temp_depth_m, fill= temp_c)) +
 
 spref_deep<-ggplot(Ffinal, aes(doy_frac, temp_depth_m, fill= temp_c)) + 
   geom_tile()+ylim(c(2.15,-0.15))+
-  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
-  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
   xlim(143,233)+
   scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, 'Spectral')),name="Temperature (C)",
                        limits=c(14,38),)+
@@ -357,8 +393,11 @@ spref_deep<-ggplot(Ffinal, aes(doy_frac, temp_depth_m, fill= temp_c)) +
 
 spnut_deep<-ggplot(Bfinal, aes(doy_frac, temp_depth_m, fill= temp_c)) + 
   geom_tile()+ylim(c(2.15,-0.15))+
-  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
-  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = -0.15, xend = 190, yend = -0.15), size=1.2, col="black")+
+#  geom_segment(aes(x = 185, y = 2.15, xend = 190, yend = 2.15), size=1.2, col="black")+
+  geom_vline(xintercept=176, linetype="dashed")+
+  geom_vline(xintercept=211, linetype="dashed")+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
   xlim(143,233)+
   scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, 'Spectral')),name="Temperature (C)",
                        limits=c(14,38),)+
@@ -371,7 +410,9 @@ spnut_deep<-ggplot(Bfinal, aes(doy_frac, temp_depth_m, fill= temp_c)) +
 # pond F, shallow site
 F21_can<-ggplot(subset(canopy, site_id=="F21"), aes(x=doy, y=canopy_per))+
   geom_area(fill="grey80", alpha=0.8)+
+#  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill="white")+
   geom_line(color="grey20", size=1)+
+  geom_point(color="grey20")+
   xlim(143,234)+
   theme_classic()+theme(plot.margin=margin(t=5,r=2, b=6, l=0, unit="pt"))+
   ylab("Canopy (%)")+theme(axis.text.y=element_text(color="black",size=8), axis.title.y =element_text(size=10),legend.position="none",
@@ -381,7 +422,11 @@ F21_can<-ggplot(subset(canopy, site_id=="F21"), aes(x=doy, y=canopy_per))+
 # pond B, shallow site
 B21_can<-ggplot(subset(canopy, site_id=="B21"), aes(x=doy, y=canopy_per))+
   geom_area(fill="grey80", alpha=0.8)+
+#  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill="white")+
   geom_line(color="grey20", size=1)+
+  geom_point(color="grey20")+
+#  geom_vline(xintercept=176, linetype="dashed")+
+#  geom_vline(xintercept=211, linetype="dashed")+
   xlim(143,234)+ 
   theme_classic()+theme(plot.margin=margin(t=0,r=2, b=4, l=0, unit="pt"))+
   ylab("Canopy (%)")+theme(axis.text.y=element_text(color="black",size=8), axis.title.y =element_text(size=10),legend.position="none",
@@ -391,7 +436,9 @@ B21_can<-ggplot(subset(canopy, site_id=="B21"), aes(x=doy, y=canopy_per))+
 # pond F, middle site
 F20_can<-ggplot(subset(canopy, site_id=="F20"), aes(x=doy, y=canopy_per))+
   geom_area(fill="grey80", alpha=0.8)+
+#  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill="white")+
   geom_line(color="grey20", size=1)+
+  geom_point(color="grey20")+
   xlim(143,234)+
   theme_classic()+theme(plot.margin=margin(t=5,r=2, b=6, l=0, unit="pt"))+
   theme(legend.position="none",
@@ -402,7 +449,11 @@ F20_can<-ggplot(subset(canopy, site_id=="F20"), aes(x=doy, y=canopy_per))+
 # pond B, middle site
 B20_can<-ggplot(subset(canopy, site_id=="B20"), aes(x=doy, y=canopy_per))+
   geom_area(fill="grey80", alpha=0.8)+
+#  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill="white")+
   geom_line(color="grey20", size=1)+
+  geom_point(color="grey20")+
+#  geom_vline(xintercept=176, linetype="dashed")+
+#  geom_vline(xintercept=211, linetype="dashed")+
   xlim(143,234)+ 
   theme_classic()+theme(plot.margin=margin(t=0,r=2, b=4, l=0, unit="pt"))+
   theme(legend.position="none",
@@ -413,7 +464,9 @@ B20_can<-ggplot(subset(canopy, site_id=="B20"), aes(x=doy, y=canopy_per))+
 # pond F, deep site
 F19_can<-ggplot(subset(canopy, site_id=="F19"), aes(x=doy, y=canopy_per))+
   geom_area(fill="grey80", alpha=0.8)+
+#  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill="white")+
   geom_line(color="grey20", size=1)+
+  geom_point(color="grey20")+
   xlim(143,234)+
   theme_classic()+theme(plot.margin=margin(t=5,r=2, b=6, l=0, unit="pt"))+
   theme(legend.position="none",
@@ -424,7 +477,11 @@ F19_can<-ggplot(subset(canopy, site_id=="F19"), aes(x=doy, y=canopy_per))+
 # pond B, deep site
 B19_can<-ggplot(subset(canopy, site_id=="B19"), aes(x=doy, y=canopy_per))+
   geom_area(fill="grey80", alpha=0.8)+
+#  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill="white")+
   geom_line(color="grey20", size=1)+
+  geom_point(color="grey20")+
+#  geom_vline(xintercept=176, linetype="dashed")+
+#  geom_vline(xintercept=211, linetype="dashed")+
   xlim(143,234)+
   theme_classic()+theme(plot.margin=margin(t=0,r=2, b=4, l=0, unit="pt"))+
   theme(legend.position="none",
@@ -466,7 +523,37 @@ spectral_heatmap<-grid.arrange(F21_can, F20_can, F19_can, spref_shal, spref_mid,
                                                      c(13, 13, 13)))
 
 
-ggsave("Figure4_spectral.png", spectral_heatmap, width=8, height=7, units="in", dpi=300)
+ggsave("Figure4_spectral_new.png", spectral_heatmap, width=8, height=7, units="in", dpi=300)
+
+
+#another version of this as a line plot because of the reviewer
+Ffinal$depth_f<-as.factor(Ffinal$temp_depth_m)
+Ffinal_viz<-Ffinal %>% 
+  filter(depth_f!=1.75)
+Flineplot<-
+  ggplot(data=Ffinal_viz, aes(x=doy_frac, y=temp_c, group=temp_depth_m))+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
+  geom_line(aes(color=depth_f),size=1)+
+  scale_colour_manual(values = c("#DB4051", "#F86F44","#FDAE61","#FEE18C","#ECFC9C", "#B0E3A9", "#9AD8C4","#338ABF"))+
+  theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  xlab("Day of Year") + ylab("Temperature (C)")+theme(axis.text=element_text(color="black",size=12),axis.title=element_text(size=14))+
+  theme(legend.title=element_blank(), legend.position = c(0.8,0.1),legend.text = element_text(size=14))
+
+Bfinal$depth_f<-as.factor(Bfinal$temp_depth_m)
+Bfinal_viz<-Bfinal %>% 
+  filter(depth_f!=1.75)
+Blineplot<-
+  ggplot(data=Bfinal_viz, aes(x=doy_frac, y=temp_c, group=temp_depth_m))+
+  geom_rect(aes(xmin=185, xmax=190, ymin=-Inf, ymax=Inf), color="grey10", fill=NA)+
+  geom_line(aes(color=depth_f),size=1)+
+  geom_vline(xintercept=176, linetype="dashed")+
+  geom_vline(xintercept=211, linetype="dashed")+
+  scale_colour_manual(values = c("#DB4051", "#F86F44","#FDAE61","#FEE18C","#ECFC9C", "#B0E3A9", "#9AD8C4","#338ABF"))+
+  theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  xlab("Day of Year") + ylab("Temperature (C)")+theme(axis.text=element_text(color="black",size=12),axis.title=element_text(size=14))+
+  theme(legend.title=element_blank(), legend.position = c(0.8,0.1),legend.text = element_text(size=14))
+
+grid.arrange(Flineplot,Blineplot,nrow=2)
 
 
 #### FIGURE 5 - Air temperature and wind speed (extrinsic factors influencing pond thermal structure) --------------------------------------------
@@ -696,8 +783,8 @@ ggsave("FigureS8_doheatmap.png", new_do_heatmap, width=7, height=9, unit="in", d
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # SUPPLEMENTARY INFORMATION FIGURES ---------------------------------------------------------------------------------------------------------------------------------
 #     Fig. S1 - Examples of individual DO saturation profiles near deep sites (methods)
-#     Fig. S2 - Estimated thermocline depth over time by pond
-#     Fig. S3 - Lake Number over time by pond
+#     Fig. S2 - Qualitative comparison of macrophyte growth and senescence across all six experimental ponds
+#     Fig. S3 - Estimated thermocline depth over time by pond
 #     Fig. S4 - Bottom water temperature time series across sampling sites
 #     Fig. S5 - Time series of surface, bottom, a delta-dissolved oxygen saturation
 
@@ -733,7 +820,22 @@ DO_profiles<-grid.arrange(DOB5,DOF5,DO_legend, nrow=1,
 
 ggsave("DO_profiles.png", DO_profiles, width=8, height=4, units="in", dpi=300)
 
-#### Figure S2 - Estimated thermocline depth over time by pond -----------------------------------------------------------------------------------------------------
+#### Figure S2 - Qualitative comparison of macrophyte growth and senescence across all six experimental ponds -----------------------------------------------------
+percent_change = c( -100.00, # B - low + nutrients
+                    -18.05, # F - low reference
+                    NA,
+                    -68.77, # A - intermediate + nutrients
+                    551.26, # D - intermediate reference
+                    NA,
+                    16.91, # C - high + nutrients
+                    75.00) # E - high reference
+
+barplot(percent_change, col = c("#D4A430","#238681", "white"), cex.axis = 1)
+mtext(side = 2, line = 3, "% Change in Biomass", cex = 1.25)
+abline(0,0)
+
+
+#### Figure S3 - Estimated thermocline depth over time by pond -----------------------------------------------------------------------------------------------------
 # Read in high frequency water temperature profiles in WIDE format
 wtrF<-load.ts("temp_hf_Fmid_wide.txt")
 wtrB<-load.ts("temp_hf_Bmid_wide.txt")
@@ -782,7 +884,7 @@ thermo_filter<-thermo_BOTH %>%
 thermo_filterF<-subset(thermo_filter, pond=="F")
 thermo_filterB<-subset(thermo_filter, pond=="B")
 
-#### FIGURE S2 ------------------------------------------------
+#### FIGURE S3 ------------------------------------------------
 thermo_f<-
   ggplot(data=thermo_filterF, aes(x=doy_frac, y=thermo.depth))+
   geom_rect(aes(xmin=180, xmax=198, ymin=-Inf, ymax=Inf), color=NA, fill="grey80")+
@@ -807,181 +909,6 @@ thermo_b<-
 
 thermo_plot<-grid.arrange(thermo_f, thermo_b, nrow=2)
 ggsave("FigureS2_thermdepth.png", thermo_plot, width=7, height=6, units="in", dpi=300)
-
-#### Figure S3 - Lake Number over time by pond ---------------------------------------------------------------------------------------------------------------------
-# manual Lake Number script (R. Ladwig)
-# use wtrF, wtrB, bathy loaded for thermocline depth calculations
-
-wnd<-load.ts("wind2_wide.txt") # load wind data 
-
-Ao<-400 # area of ponds
-wnd.height<-4 # height of wind sensor above the ponds
-
-# ts.lake.number
-lake_no <- ts.lake.number(wtrF, wnd, wnd.height, bathy, seasonal=TRUE)
-plot(lake_no, ylab='Lake Number', xlab='Date')
-lake_noB<-ts.lake.number(wtrB, wnd, wnd.height, bathy, seasonal=TRUE)
-plot(lake_noB, ylab='Lake Number', xlab='Date')
-
-# manual lake number 
-# Pond F (Reference Pond)
-df = wtrF 
-idx = match(wnd$datetime,df$datetime)
-df = df[idx,]
-
-ssi <-ts.schmidt.stability(df, bathy)
-plot(ssi, ylab='Schmidt stability', xlab='Date')
-zv <- bathy$depths %*% bathy$areas / sum(bathy$areas )
-
-metaDeps <- ts.meta.depths(wtr = df)
-epi.temp <- ts.layer.temperature(wtr = df, top = 0, bottom = metaDeps$top, bathy = bathy, na.rm = T)
-hypo.temp <- ts.layer.temperature(wtr = df, top = metaDeps$top, bottom = max(bathy$depths), bathy = bathy, na.rm = T)
-wnd_shear <- 1.310e-3 * 1.4310e-3 * wnd$wnd^2
-wnd_shear <- uStar(wndSpeed = wnd$wnd, wndHeight = wnd.height, 
-                   averageEpiDense = water.density(epi.temp$layer.temp))
-
-bthA = bathy$areas
-bthD = bathy$depths
-uStar = sqrt(wnd_shear)
-St = ssi
-metaT = metaDeps$top
-metaB = metaDeps$bottom
-averageHypoDense = water.density(hypo.temp$layer.temp) 
-g	<-	9.81
-dz	<-	0.1
-# if bathymetry has negative values, remove.
-# intepolate area and depth to 0
-Ao	<-	bthA[1]
-Zo	<-	bthD[1]
-if (Ao==0){stop('Surface area cannot be zero, check *.bth file')}
-#interpolates the bathymetry data
-layerD	<-	seq(Zo,max(bthD),dz)
-layerA	<-	stats::approx(bthD,bthA,layerD)$y
-#find depth to the center of volume
-Zv = layerD*layerA*dz                    
-Zcv = sum(Zv)/sum(layerA)/dz
-
-St_uC = St$schmidt.stability*Ao/g
-# Calculates the Lake Number according to the formula provided
-Ln = g*St_uC*(metaT+metaB)/(2*averageHypoDense*uStar^2*Ao^(3/2)*Zcv)
-
-df.ln <- data.frame('datetime' = df$datetime,
-                    'lakenumber' = Ln)
-
-
-
-# Pond B (Nutrient Addition Pond)
-df = wtrB
-idx = match(wnd$datetime,df$datetime)
-df = df[idx,]
-
-ssi <-ts.schmidt.stability(df, bathy)
-plot(ssi, ylab='Schmidt stability', xlab='Date')
-zv <- bathy$depths %*% bathy$areas / sum(bathy$areas )
-
-metaDeps <- ts.meta.depths(wtr = df)
-epi.temp <- ts.layer.temperature(wtr = df, top = 0, bottom = metaDeps$top, bathy = bathy, na.rm = T)
-hypo.temp <- ts.layer.temperature(wtr = df, top = metaDeps$top, bottom = max(bathy$depths), bathy = bathy, na.rm = T)
-wnd_shear <- 1.310e-3 * 1.4310e-3 * wnd$wnd^2
-wnd_shear <- uStar(wndSpeed = wnd$wnd, wndHeight = wnd.height, 
-                   averageEpiDense = water.density(epi.temp$layer.temp))
-
-bthA = bathy$areas
-bthD = bathy$depths
-uStar = sqrt(wnd_shear)
-St = ssi
-metaT = metaDeps$top
-metaB = metaDeps$bottom
-averageHypoDense = water.density(hypo.temp$layer.temp) 
-g	<-	9.81
-dz	<-	0.1
-# if bathymetry has negative values, remove.
-# intepolate area and depth to 0
-Ao	<-	bthA[1]
-Zo	<-	bthD[1]
-if (Ao==0){stop('Surface area cannot be zero, check *.bth file')}
-#interpolates the bathymetry data
-layerD	<-	seq(Zo,max(bthD),dz)
-layerA	<-	stats::approx(bthD,bthA,layerD)$y
-#find depth to the center of volume
-Zv = layerD*layerA*dz                    
-Zcv = sum(Zv)/sum(layerA)/dz
-
-St_uC = St$schmidt.stability*Ao/g
-# Calculates the Lake Number according to the formula provided
-Ln = g*St_uC*(metaT+metaB)/(2*averageHypoDense*uStar^2*Ao^(3/2)*Zcv)
-
-df.lnB <- data.frame('datetime' = df$datetime,
-                    'lakenumber' = Ln)
-
-
-
-# add DOY and join LN data frames from each pond
-#    Pond F
-df.ln$doy<-yday(df.ln$datetime)
-df.ln$doy_frac<-hour(df.ln$datetime)
-df.ln$min<-minute(df.ln$datetime)
-df.ln$minfrac[df.ln$min=="30"] <- 0.5
-df.ln$minfrac[df.ln$min=="0"] <- 0
-df.ln$hourfrac<-(df.ln$doy_frac + df.ln$minfrac)/24
-
-df.ln$doy_frac<-df.ln$doy+df.ln$hourfrac
-LN_F<-df.ln %>% 
-  select(datetime,doy,doy_frac,lakenumber)
-LN_F$pond<-"F"
-
-#    Pond B
-df.lnB$doy<-yday(df.lnB$datetime)
-df.lnB$doy_frac<-hour(df.lnB$datetime)
-df.lnB$min<-minute(df.lnB$datetime)
-df.lnB$minfrac[df.lnB$min=="30"] <- 0.5
-df.lnB$minfrac[df.lnB$min=="0"] <- 0
-df.lnB$hourfrac<-(df.lnB$doy_frac + df.lnB$minfrac)/24
-
-df.lnB$doy_frac<-df.lnB$doy+df.lnB$hourfrac
-LN_B<-df.lnB %>% 
-  select(datetime,doy,doy_frac,lakenumber)
-LN_B$pond<-"B"
-
-LN_BOTH<-rbind(LN_F, LN_B) # bind LN dataframes for both ponds together
-
-LN_daily<-LN_BOTH %>% #calculate daily mean LN
-  group_by(pond, doy) %>% 
-  summarize(mean_LN=mean(lakenumber))
-
-ggplot(data=LN_BOTH, aes(x=doy_frac, y=lakenumber, group=pond))+
-  geom_line(aes(color=pond),size=1)+xlim(143,233)+  scale_y_continuous(trans='log10') +
-  geom_hline(yintercept=1, linetype = 2) +
-  theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab("Day of Year") + ylab("Lake Number")+theme(axis.text=element_text(color="black",size=12),axis.title=element_text(size=14))
-
-ggplot(data=LN_daily, aes(x=doy, y=mean_LN, group=pond))+
-  geom_line(aes(color=pond),size=1)+xlim(143,233)+  scale_y_continuous(trans='log10') +
-  geom_hline(yintercept=1, linetype = 2) +
-  theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab("Day of Year") + ylab("Lake Number")+theme(axis.text=element_text(color="black",size=12),axis.title=element_text(size=14))
-
-#### Figure S3 -----------------------------------------------------------------------------------------------------------------------------
-#lake number pond F
-LNF_plot<-
-  ggplot(data=LN_F, aes(x=doy_frac, y=lakenumber))+
-  geom_line(color=pondF_col_dark,size=1)+scale_y_continuous(trans='log10') +
-  xlim(143,233)+
-  geom_hline(yintercept=1, linetype = 2) +
-  theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab(" ") + ylab("Lake Number")+theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11),
-                                        axis.title.x=element_blank(),axis.text.y=element_text(angle=90,hjust=0.5))
-#lake number pond B
-LNB_plot<-
-  ggplot(data=LN_B, aes(x=doy_frac, y=lakenumber))+
-  geom_line(color=pondB_col_dark,size=1)+xlim(143,233)+  scale_y_continuous(trans='log10') +
-  geom_hline(yintercept=1, linetype = 2) +
-  theme_linedraw()+theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
-  xlab("Day of Year") + ylab("Lake Number")+theme(axis.text=element_text(color="black",size=9),axis.title=element_text(size=11),
-                                                        axis.text.y=element_text(angle=90,hjust=0.5))
-
-LN_full<-grid.arrange(LNF_plot, LNB_plot, nrow=2)
-ggsave("LakeNumber.png",LN_full,width=8, height=6, unit="in", dpi=300)
 
 
 #### Figure S4 - Time series of bottom water temperatures by station, pond ----------------------------------------------------------------------
@@ -1162,4 +1089,37 @@ delta_do_plot<-
 
 DO_SI_FULL<-grid.arrange(surface_do_plot, bottom_do_plot, delta_do_plot, nrow=2)
 ggsave("FigureS5DO.png", DO_SI_FULL, width=8, height=7.5, units="in", dpi=300)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# APPENDIX - Calculation of critical depth of polymixis -------------------------------------------------------------------------------------------------------------
+# Following method of: Kirillin, G., and T. Shatwell. 2016. Generalized scaling of seasonal thermal stratification in lakes. Earth Sci. Rev. 161: 179-190, doi: 10.1016/j.earscirev.2016.08.008
+
+secchi <- read.csv("secchi.csv") %>%
+  filter(pond == "B")
+meteo <- read.csv('meteorological_ISU_hortfarm.csv')
+
+# Kirillin and Shatwell (2016)
+# Hcrit = h = C1 h_secchi + sqrt(C1^2 h_secchi^2 + C2 L L_MO)
+
+# length of pond (m)
+L = 10
+# mean pond depth (m)
+H_pond = 0.8
+
+# friction velocity
+u_star = sqrt(1.3 * 10^(-3) * 1.43 * 10^(-3) * meteo$WindSpeed^2)
+u_correct = u_star * (1 - exp(-0.002 * L))
+
+# monin-obukhov length scale
+Lmo = mean(u_correct^3) / mean(meteo$ShortWave)
+
+# criterion
+C1 = 0.493
+C2 = 0.00060
+Hcrit = C1 * mean(secchi$secchi, na.rm =T) + 
+  sqrt(C1**2 * mean(secchi$secchi, na.rm = T)**2 + C2 * L * Lmo)
+
+H_pond > Hcrit # False, the mean depth is less than the critical depth of polymixis. Expect the pond to be well mixed in the absence of internal structure.
+Hcrit
+
 
